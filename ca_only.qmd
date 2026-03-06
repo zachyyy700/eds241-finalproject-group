@@ -6,7 +6,8 @@ author:
 - name: "William Mullins"
 - name: "Sofia Sarak"
 date: "March 6, 2026"
-format: html
+format: html:
+  theme: flatly
 editor: visual
 ---
 
@@ -30,6 +31,8 @@ knitr::include_graphics("images/figure4.png")
 ```
 
 # Study Design
+
+------------------------------------------------------------------------
 
 ## Randomized experiment
 
@@ -85,63 +88,54 @@ The treatment effect is negative (reduces concern of SLR risk), regardless of ge
 
 # Recreation of Results/Figure 4
 
+------------------------------------------------------------------------
+
+## Load Required Packages
+
+```{r}
+library(tidyverse)
+library(broom)
+library(estimatr)
+```
+
 ## Load and Clean California Data
 
 ```{r}
 #| message: false
 #| warning: false
 
-library(tidyverse)
-library(broom)
-library(estimatr)
-
 # Load CA survey data
-data_ca <- read_csv("data/SeaLevelRiseSurvey_California_January+16,+2021_13.54.csv") %>%
+data_ca <- read_csv("https://dataverse.harvard.edu/api/access/datafile/10933509") %>%
   .[-c(1,2),] %>%
   mutate(geo = "CA")
 
-# Load CA distance-to-boundary file
-dist_ca <- read_csv("data/ca_dist_mins.csv")
+# CA distance-to-boundary file
+dist_ca <- read_csv("https://dataverse.harvard.edu/api/access/datafile/10933516")
 
 # Load CA combined metadata
-cw_ca <- read_csv("data/ca_combined_final_withtraffic_sub.csv")
+cw_ca <- read_csv("https://dataverse.harvard.edu/api/access/datafile/10933510")
 
 # Load flood zone file
-fld_zone <- read.csv("data/fld_zone.csv")
+fld_zone <- read.csv("https://dataverse.harvard.edu/api/access/datafile/10933526")
 
 ```
 
 ## Merge Survey, Distance and Flood Zone
 
 ```{r}
-#| warning: false
-
 dist_ca_clean <- dist_ca %>% 
-  
-  # Keep only the first occurrence of each duplicate
+  # Keep only the first occurrence
   filter(!duplicated(.)) %>%
-  
-  # Group by address
   group_by(adds) %>%
-  
-  # Keep observations only where the address corresponds to the minimum distance
-  # (For cases with address duplicates)
+  # Filter to minimum at each address
   filter(dist_min == min(dist_min)) %>%
-  
-  # Join traffic data on addresses, and retain corresponding emails and IDS
-  inner_join(
-    cw_ca %>% select(adds, email, FID) %>% filter(!duplicated(.)),
-    by = "adds"
-  ) %>%
-  
-  # Clean variable name
+    inner_join(cw_ca %>%  # Join traffic data on addresses, and retain corresponding emails and IDS
+      select(adds, email, FID) %>% 
+      filter(!duplicated(.))) %>%
   rename(RecipientEmail = email) %>%
-  
-  # Join flood zone info on addresses, keeping county, tract, and flood zone info
-  inner_join(
-    fld_zone %>% select(adds, COUNTYFP, TRACTCE, FLD_ZONE) %>% filter(!duplicated(.)),
-    by = "adds"
-  )
+  inner_join(fld_zone %>% # Join flood zone info on addresses, keeping county, tract, and flood zone info
+             select(adds, COUNTYFP, TRACTCE, FLD_ZONE) %>% 
+             distinct(adds, .keep_all = TRUE))
 ```
 
 In the analysis we are replicating in this blog post, traffic data is not used (but it used for another experiment in the same study, which is why it is included here).
@@ -175,14 +169,12 @@ dv_recode <- function(x){
   )
 }
 
-# Final clean data frame
+# Clean CA data frame
 data_ca_clean <- data_ca %>%
-  
   # Join with cleaned distance data, by email
   left_join(dist_ca_clean, by = "RecipientEmail") %>%
-  
-  mutate(
     
+  mutate(
     # Boolean variable denoting whether observation received a map treatment
     treat_map = !is.na(exp_emphasis),
     
@@ -271,6 +263,8 @@ ggplot(effects_ca, aes(x = dist_bin, y = estimate)) +
 ```
 
 # Interpretation
+
+------------------------------------------------------------------------
 
 Three key insights emerge from the California analysis:
 
